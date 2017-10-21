@@ -5,7 +5,7 @@ public class HelloWord {
     public static void main(String[] args) {
         System.out.println("Hello world");
 
-        System.out.println("BCD");
+        System.out.println("server edit");
 
         System.out.println("abc");
         System.out.println("dce");
