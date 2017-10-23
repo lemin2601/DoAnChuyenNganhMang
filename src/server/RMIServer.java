@@ -8,16 +8,16 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
 import java.util.Queue;
 
-/**
- * Created by Administrator on 10/21/2017.
- */
 public class RMIServer extends UnicastRemoteObject implements InterfServer {
 
+    ArrayList<InterfServer> servers;
 //    Queue<Message> messageQueue ;
     public RMIServer() throws RemoteException {
         super();
+        servers = new ArrayList<>();
     }
     @Override
     public <T> T execute(Task<T> t) throws RemoteException {
@@ -36,12 +36,12 @@ public class RMIServer extends UnicastRemoteObject implements InterfServer {
 
     @Override
     public boolean AddServer(InterfServer server) throws RemoteException {
-        return false;
+        return servers.add(server);
     }
 
     @Override
     public boolean RemoveServer(InterfServer server) throws RemoteException {
-        return false;
+        return servers.remove(server);
     }
 
     @Override
@@ -92,7 +92,7 @@ public class RMIServer extends UnicastRemoteObject implements InterfServer {
 
     public static void main(String[] args) {
 
-        String IpDatabase = "192.168.1.1";
+        String IpDatabase = "192.168.8.1";
 
         while (true) {
             try {
@@ -136,6 +136,10 @@ public class RMIServer extends UnicastRemoteObject implements InterfServer {
             System.out.print("Stilling connected");
             for (int i = 0; i < System.currentTimeMillis() / 1000 % 10; i++) {
                 System.out.print(".");
+            }
+            ArrayList<InterfServer> serverLists = database.getServerLists();
+            for(InterfServer sv :serverLists){
+                System.out.print(sv.getIP() + " ");
             }
             return true;
         } catch (RemoteException e) {
