@@ -1,8 +1,8 @@
-package database;
+package controller;
 
-import lib.Task;
-import lib.Ticket;
-import server.InterfServer;
+import bean.Task;
+import bean.Ticket;
+import controller.InterfServer;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
@@ -17,7 +17,7 @@ public interface InterfDatabase extends Remote{
     String getIP() throws RemoteException;
 
     //booking ticket
-    int BookingTicket(Ticket ticket) throws  RemoteException;
+    int UpdateTicket(Ticket ticket) throws  RemoteException;
     ArrayList<Ticket> getTicketLists() throws  RemoteException;
 
     //connect

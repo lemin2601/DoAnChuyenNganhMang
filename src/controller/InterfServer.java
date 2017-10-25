@@ -1,7 +1,7 @@
-package server;
+package controller;
 
-import lib.Message;
-import lib.Task;
+import bean.Message;
+import bean.Task;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
@@ -16,7 +16,6 @@ public interface InterfServer extends Remote {
     void CheckConnection() throws  RemoteException;
     boolean AddServer(InterfServer server) throws  RemoteException;
     boolean RemoveServer(InterfServer server) throws  RemoteException;
-
 
     //booking ticket
     boolean PushMessage(Message message)throws RemoteException;
