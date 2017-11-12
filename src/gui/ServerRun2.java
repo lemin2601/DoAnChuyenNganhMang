@@ -1,8 +1,7 @@
 package gui;
 
-import controller.InterfServer;
-import controller.RMIServer;
-import controller.InterfDatabase;
+import conf.TicketStatus;
+import controller.*;
 import lib.Lib;
 import bean.Ticket;
 import conf.Configure;
@@ -21,6 +20,7 @@ public class ServerRun2 {
         String IpDatabase = "192.168.8.1";
         InterfDatabase database = null;
         InterfServer server = null;
+        LamportManager lamportManager = null;
         // code add server to database server
         try {
             // Connect to remote object
@@ -31,16 +31,38 @@ public class ServerRun2 {
              database.Register(server);
             ((RMIServer) server).setServers(database.getServerLists());
             System.out.println("Worker's ID: " + ((RMIServer) server).getIP());
+
+            lamportManager = new LamportManager( server);
+
+            boolean change = false;
+            while(true)
+            {
+                System.out.println("run ...");
+                Ticket ticket = new Ticket(2, (change ? TicketStatus.FREE:TicketStatus.BOUGHT));
+                Thread thread = new Thread(new ThreadAccessData(database,lamportManager,ticket));
+                thread.start();
+                change = ! change;
+                try {
+                    thread.join();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
+
         } catch (RemoteException | NotBoundException ex) {
+            ex.printStackTrace();
         }
 
-        //code call getListTicket();
-        for(Ticket ticket : database.getTicketLists()){
-            System.out.println(ticket.toString());
-        }
+        System.out.println(database.getTicketLists().toString());
 
         //code disconnect to database
-        database.UnRegis(server);
+//        database.UnRegis(server);
         System.exit(0);
     }
 }

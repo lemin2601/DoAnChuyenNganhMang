@@ -20,7 +20,8 @@ public class ServerRun {
 
         String IpDatabase = "192.168.8.1";
         // code add server to database server
-        while (true) {
+        //while (true)
+        {
             try {
                 // Connect to remote object
                 System.setProperty("java.rmi.server.hostname", Lib.getMyIp());
@@ -30,47 +31,59 @@ public class ServerRun {
                 Registry r = LocateRegistry.getRegistry(IpDatabase, Configure.PORT);
 
                 InterfDatabase database = (InterfDatabase) r.lookup(Configure.DATABASE_SERVICE_NAME);
+                server.setId(database.getID());
                 database.Register(server);
+
                 ((RMIServer) server).setServers(database.getServerLists());
                 System.out.println("Worker's ID: " + ((RMIServer) server).getIP());
 
                 //ki?m tra k?t n?i v?i server
                 //code check connect to database and list<server> every second
                 while (checkConnect(database)) {
+                    System.out.printf("\r%60s\r", "");
+                    checkConnect(((RMIServer) server).getServers());
+
                     try {
-                        checkConnect(((RMIServer) server).getServers());
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ex) {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
                 }
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             } catch (RemoteException | NotBoundException ex) {
+                ex.printStackTrace();
             }
             //code reconnect to database server if disconnect
-            System.out.printf("\r%60s\r", "");
-            System.out.print("Trying connect to server");
-            for (int i = 0; i < System.currentTimeMillis() / 1000 % 10; i++) {
-                System.out.print(".");
-            }
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException ex) {
-            }
+//            System.out.printf("\r%60s\r", "");
+//            System.out.print("Trying connect to server");
+//            for (int i = 0; i < System.currentTimeMillis() / 1000 % 10; i++) {
+//                System.out.print(".");
+//            }
+//            try {
+//                Thread.sleep(1000);
+//            } catch (InterruptedException ex) {
+//            }
         }
     }
 
     //check connect to list<server>
-    static  boolean checkConnect(ArrayList<InterfServer> serverList){
+    static boolean checkConnect(ArrayList<InterfServer> serverList) {
         try {
-            for(InterfServer sv :serverList){
-                System.out.print(sv.getIP() + " ");
+            for (InterfServer sv : serverList) {
+                System.out.print(sv.getID() + " ");
             }
-            System.out.println();
             return true;
         } catch (RemoteException e) {
+            e.printStackTrace();
             System.out.println("Disconnected by PC side");
         }
         return false;
     }
+
     //Check connect to database and list<server>
     static boolean checkConnect(InterfDatabase database) {
         try {

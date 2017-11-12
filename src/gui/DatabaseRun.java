@@ -27,7 +27,9 @@ public class DatabaseRun {
             InterfDatabase database;
             database = new RMIDatabase();
             r.rebind(Configure.DATABASE_SERVICE_NAME, database);
+
             System.out.println("serverWork at:" + Lib.getMyIp() + " port:" + Configure.PORT + " with name: " + Configure.DATABASE_SERVICE_NAME);
+
 
 //            Registry r_forserver = LocateRegistry.createRegistry(8808);
 //            InterfServer server_forserver;
@@ -44,9 +46,10 @@ public class DatabaseRun {
         }
     }
 
-
     private static void checkConnection(ArrayList<InterfServer> servers) {
-        while (true) {
+
+        while (true)
+        {
             System.out.printf("\r%60s\r", "");
             System.out.print("Connected IP: ");
             try {
@@ -79,7 +82,7 @@ public class DatabaseRun {
                 System.out.print(".");
             }
             try {
-                Thread.sleep(1000);
+                Thread.sleep(2000);
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
             }

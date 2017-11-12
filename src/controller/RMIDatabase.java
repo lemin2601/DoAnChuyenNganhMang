@@ -13,10 +13,11 @@ public class RMIDatabase extends UnicastRemoteObject implements InterfDatabase {
 
     static ArrayList<InterfServer> servers;
     DataManager dataManager;
-
+    int numOfClient = 0;
     public RMIDatabase() throws RemoteException {
         super();
         servers = new ArrayList<>();
+        this.dataManager = new DataManager();
 
     }
 
@@ -76,6 +77,12 @@ public class RMIDatabase extends UnicastRemoteObject implements InterfDatabase {
         //if remove success to all client --> return
         return checkRemove && servers.remove(server);
 
+    }
+
+    @Override
+    public int getID() throws RemoteException {
+
+        return  ++this.numOfClient;
     }
 
     @Override

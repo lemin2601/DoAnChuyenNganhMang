@@ -50,7 +50,6 @@ public class ModelTicket {
         } catch (SQLException ex) {
         } finally {
             try {
-                rs.close();
                 st.close();
                 conn.close();
             } catch (SQLException ex) {

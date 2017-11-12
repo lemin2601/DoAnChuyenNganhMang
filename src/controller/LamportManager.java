@@ -1,134 +1,197 @@
 package controller;
 
 import bean.Message;
+import bean.Ticket;
 import conf.LamportStatus;
 import conf.MessageStatus;
 
 import java.rmi.RemoteException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
-/**
- * Created by Administrator on 10/25/2017.
- */
-public class LamportManager implements Runnable {
+public class LamportManager {
 
-    LamportStatus lamportStatus;
-    private int currentClock = 0;
-    Queue<Message> messageQueue;
-    ArrayList<Message> messageReply;
-    InterfServer myServer;
-    HashMap<InterfServer, LamportStatus> stateServers;
-    ArrayList<InterfServer> listServers;
+    private LamportStatus lamportStatus;
+    private long currentClock = 0;
 
-    public LamportManager(RMIServer server) {
-        this.myServer = this.myServer;
-        this.listServers = server.getServers();
-        this.stateServers = new HashMap<>();
+    private InterfServer myServer;
+
+    private ArrayList<InterfServer> listServers;
+
+    HashMap<InterfServer, Boolean> needToSendReply;
+    HashMap<InterfServer, Boolean> needToReceiveRelease;
+    HashMap<InterfServer, Boolean> needToReceiveReply;
+
+    ArrayList<Message> queueToEnter;
+
+    public LamportManager(InterfServer server) {
+        this.myServer = server;
+        init();
+    }
+
+    private void init() {
         this.currentClock = 0;
-        messageQueue = new LinkedList<Message>();
+        this.listServers = new ArrayList<>();
+        this.queueToEnter = new ArrayList<>();
+
+        this.needToReceiveRelease = new HashMap<>();
+        this.needToSendReply = new HashMap<>();
+        this.needToReceiveReply = new HashMap<>();
+
+        for (InterfServer server : this.listServers) {
+            this.needToReceiveRelease.put(server, false);
+            this.needToSendReply.put(server, false);
+            this.needToReceiveReply.put(server, false);
+        }
+    }
+
+
+
+    public InterfServer getMyServer() {
+        return myServer;
+    }
+
+    public boolean addNewServer(InterfServer server) {
+        this.needToReceiveRelease.put(server,false);
+        this.needToSendReply.put(server, false);
+        this.needToReceiveReply.put(server, false);
+        return this.listServers.add(server);
+    }
+
+    public boolean removeServer(InterfServer server) {
+        this.needToReceiveRelease.remove(server);
+        this.needToSendReply.remove(server);
+        this.needToReceiveReply.remove(server);
+        return this.listServers.remove(server);
+    }
+
+    public ArrayList<InterfServer> getListServers() {
+        return this.listServers;
+    }
+
+    public void setListServers(ArrayList<InterfServer> servers) {
+        this.listServers = servers;
     }
 
     //get Message yêu c?u truy c?p mi?n g?ng v?i th?i gian current clock
-    public synchronized long getTimeStamp() {
+    public synchronized long TimeStamp() {
         return currentClock++;
     }
 
-    //g?i message ??n server
-    public boolean sendMessage(Message message, InterfServer server) {
+    public boolean addReplyAccess(Message message) {
+        //check if have request to access.
+        updateTimestamp(message);
+        return this.needToReceiveReply.put(message.getFrom(), false);
+    }
 
+    private void updateTimestamp(Message message) {
+        if(this.currentClock < message.getTimestamp()){
+            this.currentClock = message.getTimestamp();
+        }
+    }
+
+    public boolean addReleaseAccess(Message message) {
+        //remove from queue to enter.
+        updateTimestamp(message);
+        return !this.needToReceiveRelease.put(message.getFrom(),false);
+    }
+
+    public boolean addRequestAccess(Message message) {
+        updateTimestamp(message);
+        boolean result = this.queueToEnter.add(message);
+        this.needToSendReply.put(message.getFrom(), true);
+        Collections.sort(this.queueToEnter);
+        sendReplyToAll();
+        return result;
+    }
+
+    public  void sendReplyToAll(){
+        ArrayList<Message> queueToEnter = this.queueToEnter;
         try {
-            server.PushMessage(message);
-        } catch (RemoteException e) {
-            //c? g?ng g?i tin nh?n n?u không g?i ???c
-            int countTry = 0;
-            while (countTry < 3) {
+            queueToEnter.forEach(message -> {
+                if (message.getFrom() == this.getMyServer()) {
+                    return;
+                }
+                InterfServer from = message.getFrom();
+                Boolean aBoolean = this.needToSendReply.get(from);
+                if (aBoolean) {
+                    //send reply
+                    Message message1 = new Message(this.getMyServer(), MessageStatus.REP, this.TimeStamp());
+                    try {
+                        aBoolean = from.PushMessage(message1);
+                        this.needToSendReply.put(from, false);
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }catch (ConcurrentModificationException e) {
+        }
+
+    }
+    private class ThreadMessageProcess implements Runnable {
+        private LamportManager lamportManager;
+        public ThreadMessageProcess(LamportManager lamportManager) {
+            this.lamportManager = lamportManager;
+        }
+
+        /***
+         * ki?m tra x? lý ph?n h?i request ???c g?i ??n.
+         */
+        @Override
+        public void run() {
+            while (true) {
+                // 1. ki?m tra trong queue có yêu c?u.
+                //2. s?p x?p theo th?i gian timestamp t?ng d?n.
+                //3. g?i reply tr? v? client
+                //      n?u theo timestamp yêu c?u < timestamp mình không yêu c?u truy c?p database ==> reply
+                //      add yêu c?u nh?n release t? client ?ó
+                //      remove request ra kh?i queue
+                ArrayList<Message> queueToEnter = this.lamportManager.queueToEnter;
                 try {
-                    server.PushMessage(message);
-                } catch (RemoteException e1) {
-                    countTry++;
+                    queueToEnter.forEach(message -> {
+                        if (message.getFrom() == this.lamportManager.getMyServer()) {
+                            return;
+                        }
+                        InterfServer from = message.getFrom();
+                        Boolean aBoolean = this.lamportManager.needToSendReply.get(from);
+                        if (aBoolean) {
+                            //send reply
+                            Message message1 = new Message(this.lamportManager.getMyServer(), MessageStatus.REP, this.lamportManager.TimeStamp());
+                            try {
+                                aBoolean = from.PushMessage(message1);
+                                this.lamportManager.needToSendReply.put(from, false);
+                            } catch (RemoteException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+                }catch (ConcurrentModificationException e) {
                 }
             }
         }
-        return false;
     }
 
-    //g?i yêu c?u truy c?p data ??n t?t c? client
-    public boolean request() {
-        Message message = new Message(myServer, MessageStatus.REQ, getTimeStamp());
-        boolean result = false;
-        for (InterfServer server : this.listServers) {
-            LamportStatus lamportStatus = stateServers.get(server);
-            if (lamportStatus != LamportStatus.WAITING_REPLY) {
-                result = sendMessage(message,server);
-                if(result) lamportStatus = LamportStatus.WAITING_REPLY;
-            }
-        }
-        return  result;
-    }
-
-    // tr? l?i yêu c?u, cho phép truy c?p data
-    public boolean reply() {
-        Message message = new Message(myServer, MessageStatus.REP, getTimeStamp());
-        boolean result = false;
-        for (InterfServer server : this.listServers) {
-            LamportStatus lamportStatus = stateServers.get(server);
-            if (lamportStatus != LamportStatus.IN_CRITICAL_SECTION) {
-                result = sendMessage(message,server);
-                if(result) lamportStatus = LamportStatus.IN_CRITICAL_SECTION;
-            }
-        }
-        return  result;
-    }
-
-    //g?i tin nh?n thoát kh?i mi?n g?ng ??n các server
-    public boolean release() {
-        // tr? l?i yêu c?u, cho phép truy c?p data
-        Message message = new Message(myServer, MessageStatus.REL, getTimeStamp());
-        boolean result = false;
-        for (InterfServer server : this.listServers) {
-            LamportStatus lamportStatus = stateServers.get(server);
-            if (lamportStatus != LamportStatus.RELEASE) {
-                result = sendMessage(message,server);
-                if(result) lamportStatus = LamportStatus.RELEASE;
-            }
-        }
-        return  result;
-    }
-
-    @Override
-    public void run() {
-        while (true) {
-            this.receiveMessage();
-        }
-    }
-
-
-    public void receiveMessage() {
-//        for (InterfServer server:){
+    public static void main(String[] args) {
 //
+//        try {
+//            LamportManager lamportManager = new LamportManager(new RMIServer());
+//            lamportManager.sendRequest();
+//
+//
+//        } catch (RemoteException e) {
+//            e.printStackTrace();
 //        }
+        HashMap<String, Boolean> key;
+        key = new HashMap<>();
+        key.put("a", new Boolean(null));
+
+        Boolean a = key.get("a");
+        System.out.println(a.booleanValue());
+
+        a = true;
+        key.put("a", a);
+        System.out.println(a.booleanValue());
+        System.out.println(key.get("a").booleanValue());
     }
 
-    public void receiveMessage(Message message) {
-        switch (message.getType()) {
-            case REQ:
-                //yêu c?u truy c?p mi?n g?ng
-                this.messageQueue.add(message);
-                processRequest();
-                break;
-            case REP:
-                // nh?n ???c tr? l?i yêu c?u truy c?p mi?n g?ng
-                break;
-            case REL:
-                // gi?i phóng truy c?p mi?n g?ng
-                break;
-        }
-    }
-
-    private void processRequest() {
-//        if(this.lamportStatus)
-    }
 }
